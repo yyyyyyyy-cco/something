@@ -1,0 +1,40 @@
+# monopoly · 与服务器现有服务共存（遵循《新项目服务上线规范》）：
+# - 不映射宿主端口，由 nginx-proxy 按容器名内网反代（域名与配置见 deploy/nginx/monopoly.conf）
+# - 加入外部共享网络 proxy-net（nginx-proxy 同在网络）
+# - SQLite 持久化：./data 卷（备份由 ~/backup-databases.sh 登记处理，见 deploy/DEPLOY.md）
+
+services:
+  monopoly:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile
+    image: monopoly:latest
+    container_name: monopoly
+    restart: unless-stopped
+    # 日志轮转：防止日志无限增长
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    env_file: .env                      # 敏感配置放 .env，勿写入 compose
+    environment:
+      - TZ=Asia/Shanghai
+    volumes:
+      - ./data:/app/data                # 数据持久化（bind mount）
+    networks:
+      - default
+      - proxy-net
+    # 安全加固
+    security_opt:
+      - no-new-privileges:true
+    # 资源限制（规范参考值：中等 512m / 轻量 0.5）
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: "0.5"
+
+networks:
+  proxy-net:
+    external: true
